@@ -23,8 +23,18 @@ async function dashboard() {
 }
 
 module.exports = async (req, res) => {
-  if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' });
   if (!api || !key || !token) return res.status(503).json({ error: 'Telegram integration is not configured' });
+  if (req.method === 'GET' && req.query?.setup === process.env.TELEGRAM_WEBHOOK_SECRET) {
+    const webhookUrl = 'https://friends-included-finance-sigma.vercel.app/api/telegram';
+    const setup = await fetch(`https://api.telegram.org/bot${token}/setWebhook`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: webhookUrl, secret_token: process.env.TELEGRAM_WEBHOOK_SECRET })
+    });
+    if (!setup.ok) return res.status(502).json({ error: 'Telegram webhook setup failed' });
+    return res.status(200).json({ ok: true, webhook: webhookUrl });
+  }
+  if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' });
   if (process.env.TELEGRAM_WEBHOOK_SECRET && req.headers['x-telegram-bot-api-secret-token'] !== process.env.TELEGRAM_WEBHOOK_SECRET) return res.status(401).json({ error: 'Invalid webhook secret' });
   const message = req.body?.message;
   if (!message?.text) return res.status(200).json({ ok: true });
