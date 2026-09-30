@@ -2,7 +2,12 @@ const api = process.env.SUPABASE_URL;
 const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const token = process.env.TELEGRAM_BOT_TOKEN;
 
-const headers = () => ({ apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json', Prefer: 'return=representation' });
+const headers = () => ({
+  apikey: key,
+  ...(key.startsWith('eyJ') ? { Authorization: `Bearer ${key}` } : {}),
+  'Content-Type': 'application/json',
+  Prefer: 'return=representation'
+});
 const supa = async (path, options = {}) => {
   const res = await fetch(`${api}/rest/v1/${path}`, { ...options, headers: { ...headers(), ...(options.headers || {}) } });
   if (!res.ok) throw new Error(`Database request failed (${res.status})`);
