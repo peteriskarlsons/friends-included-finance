@@ -15,7 +15,7 @@ module.exports = async (_req, res) => {
       const final = sale.final_split || {};
       const earned = sale.final_earnings || {};
       rows.push([
-        sale.reference, String(sale.submitted_at || '').slice(0, 10), sale.submitted_by_name, sale.customer, sale.project, sale.description,
+        sale.reference, String(sale.submitted_at || '').slice(0, 10) ? `${String(sale.submitted_at || '').slice(0, 10)} (UTC)` : '', sale.submitted_by_name, sale.customer, sale.project, sale.description,
         sale.amount, 0.1, sale.approved_commission || '', sale.status === 'approved' ? 'Approved' : 'Pending',
         proposal.richard, proposal.anastasia, proposal.jean, final.richard ?? '', final.anastasia ?? '', final.jean ?? '',
         earned.richard ?? '', earned.anastasia ?? '', earned.jean ?? '', sale.approved_by_name || '', String(sale.approved_at || '').slice(0, 19),
