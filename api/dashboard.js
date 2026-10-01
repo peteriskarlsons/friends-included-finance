@@ -1,16 +1,22 @@
-const api = process.env.SUPABASE_URL;
-const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const get = async path => {
-  const res = await fetch(`${api}/rest/v1/${path}`, { headers: { apikey: key, Authorization: `Bearer ${key}` } });
-  if (!res.ok) throw new Error('Database unavailable');
-  return res.json();
-};
-module.exports = async (_req, res) => {
-  if (!api || !key) return res.status(503).json({ error: 'Backend not configured' });
+const { dashboardFor, isReady, loadLedger, resolveActor } = require('./lib');
+
+module.exports = async (req, res) => {
+  if (!isReady()) return res.status(503).json({ error: 'Shared ledger is not configured' });
   try {
-    const [sales, expenses] = await Promise.all([get('sales?select=reference,customer,project,amount,approved_commission,status'), get('expenses?select=reference,description,project,amount,allocation_status')]);
+    const actor = await resolveActor(req.query?.as);
+    const ledger = await loadLedger(actor);
+    const dashboard = dashboardFor(actor, ledger);
     res.setHeader('Cache-Control', 'no-store');
-    res.status(200).json({ sales, expenses, googleSheet: process.env.GOOGLE_SHEET_URL || null, telegram: '@FriendsIncludedFinance29_bot' });
-  } catch (error) { res.status(500).json({ error: error.message }); }
+    return res.status(200).json({
+      actor: { key: actor.key, name: actor.name, role: actor.role },
+      sales: ledger.sales,
+      expenses: ledger.expenses,
+      ...dashboard,
+      googleSheet: process.env.GOOGLE_SHEET_URL || 'https://docs.google.com/spreadsheets/d/1jJ1jH0tH7SW58GX9ThlU67rDJ3ghJEcRkDJN3MV0Hvg/edit',
+      testRoute: '/review.html'
+    });
+  } catch (error) {
+    return res.status(400).json({ error: error.message || 'Unable to load shared ledger' });
+  }
 };
 
