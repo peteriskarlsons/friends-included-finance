@@ -30,18 +30,24 @@ module.exports = async (req, res) => {
       const label = String(input.label || '').trim();
       if (!/^[A-Za-z0-9][A-Za-z0-9 ._-]{2,47}$/.test(label)) throw new Error('Use a 3–48 character fictional review label (letters, numbers, spaces, dots, hyphens, or underscores).');
       const request = (await supa('review_requests', { method: 'POST', body: JSON.stringify({ telegram_user_id: -Date.now(), telegram_chat_id: 0, label: `Web review: ${label}` }) }))[0];
-      return res.status(201).json({ ok: true, requestId: request.id, message: 'Fictional review request created. Open the Svetlana manager view and link this request to the Fictional Test Employee.' });
+      return res.status(201).json({ ok: true, requestId: request.id, message: 'Fictional review request created. Open the Svetlana manager view and choose either the sales-test or Kevin expense-test role.' });
     }
     const actor = await resolveActor(input.as);
     if (action === 'linkReviewRequest') {
       if (actor.role !== 'manager') throw new Error('Only the fictional manager can link a review request.');
       const requestId = String(input.requestId || '');
-      const request = (await supa(`review_requests?select=id,status&id=eq.${encodeURIComponent(requestId)}&limit=1`))[0];
-      if (!request || request.status !== 'requested') throw new Error('That review-link request is no longer pending.');
-      const testEmployee = await staffByName('Fictional Test Employee');
-      await supa(`review_requests?id=eq.${request.id}`, { method: 'PATCH', body: JSON.stringify({ status: 'linked', linked_staff_id: testEmployee.id, linked_by: actor.id, linked_at: new Date().toISOString() }) });
-      await audit(actor, 'staff', `review-${request.id}`, 'linked fictional test employee', { role: testEmployee.role, staff_name: testEmployee.name });
-      return res.status(200).json({ ok: true, message: 'The reviewer was linked to the fictional test salesperson. They can now submit only labelled TEST-S records.' });
+      const request = (await supa(`review_requests?select=id,status,linked_staff_id&id=eq.${encodeURIComponent(requestId)}&limit=1`))[0];
+      if (!request || !['requested', 'linked'].includes(request.status)) throw new Error('That review-link request is unavailable.');
+      const linkedRole = String(input.linkedRole || 'sales');
+      const targets = { sales: 'Fictional Test Employee', expenses: 'Kevin' };
+      if (!targets[linkedRole]) throw new Error('Choose the sales-test or Kevin expense-test role.');
+      const target = await staffByName(targets[linkedRole]);
+      if (target.role !== linkedRole) throw new Error('The selected fictional review role is unavailable.');
+      await supa(`review_requests?id=eq.${request.id}`, { method: 'PATCH', body: JSON.stringify({ status: 'linked', linked_staff_id: target.id, linked_by: actor.id, linked_at: new Date().toISOString() }) });
+      const actionLabel = request.status === 'linked' ? 'switched fictional review role' : 'linked fictional review role';
+      await audit(actor, 'staff', `review-${request.id}`, actionLabel, { linked_role: target.role, staff_name: target.name });
+      const command = linkedRole === 'sales' ? 'TEST-S' : 'TEST-E';
+      return res.status(200).json({ ok: true, message: `The reviewer is linked to ${target.name}'s ${target.role} role. They can now submit only labelled ${command} records; this never grants manager access.` });
     }
     if (action === 'sale') {
       if (actor.role !== 'sales') throw new Error('Only sales employees can submit test sales.');
