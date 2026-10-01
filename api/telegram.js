@@ -48,14 +48,22 @@ module.exports = async (req, res) => {
   try {
     if (command === '/review') {
       const request = await requestReviewLink(userId, chatId);
+      const linked = request.status === 'linked' ? await telegramActorFor(userId) : null;
+      const commandHint = linked?.role === 'expenses' ? '/test-expense' : linked?.role === 'sales' ? '/test-sale' : 'the assigned test command';
       const text = request.status === 'linked'
-        ? 'Your fictional test employee is already linked. Use /dashboard or submit a labelled test with /test-sale.'
-        : 'Your review request is recorded. A manager must link you to the fictional test employee in the web review route before test commands are enabled. This command does not grant manager access.';
+        ? `Your manager-controlled review role is already linked. Use /dashboard or ${commandHint}. Only a manager can switch the sales-test and Kevin expense-test roles.`
+        : 'Your review request is recorded. A manager must choose either the sales-test or Kevin expense-test role in the web review route before test commands are enabled. This command does not grant manager access.';
       await reply(chatId, text);
       return res.status(200).json({ ok: true });
     }
     if (command === '/start' || command === '/help') {
-      await reply(chatId, 'Friends Included Finance\n/dashboard — your server-filtered records\n/review — request a manager-controlled fictional test link\n/test-sale TEST-S01|A|Customer|1250|Description|50|30|20\n/test-expense TEST-E01|Travel|140|Description|A\nManagers: /approve TEST-S01|50|30|20 · /allocate TEST-E01|B\n\nOriginal S01–S05 and E01–E07 are read-only course records.');
+      const linked = await telegramActorFor(userId);
+      const roleHelp = linked?.role === 'sales'
+        ? 'Your linked role: sales. Use /test-sale TEST-S01|A|Customer|1250|Description|50|30|20'
+        : linked?.role === 'expenses'
+          ? 'Your linked role: Kevin expenses. Use /test-expense TEST-E01|Travel|140|Description|A'
+          : 'After a manager chooses your role: sales uses /test-sale TEST-S01|A|Customer|1250|Description|50|30|20; Kevin expenses uses /test-expense TEST-E01|Travel|140|Description|A.';
+      await reply(chatId, `Friends Included Finance\n/dashboard — your server-filtered records\n/review — request a manager-controlled fictional test link\n${roleHelp}\nManagers: /approve TEST-S01|50|30|20 · /allocate TEST-E01|B\n\nOriginal S01–S05 and E01–E07 are read-only course records.`);
       return res.status(200).json({ ok: true });
     }
     const staff = await telegramActorFor(userId);
