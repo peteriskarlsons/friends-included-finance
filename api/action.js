@@ -25,8 +25,14 @@ module.exports = async (req, res) => {
   if (!isReady()) return res.status(503).json({ error: 'Shared ledger is not configured' });
   try {
     const input = bodyFor(req);
-    const actor = await resolveActor(input.as);
     const action = input.action;
+    if (action === 'createWebReviewRequest') {
+      const label = String(input.label || '').trim();
+      if (!/^[A-Za-z0-9][A-Za-z0-9 ._-]{2,47}$/.test(label)) throw new Error('Use a 3–48 character fictional review label (letters, numbers, spaces, dots, hyphens, or underscores).');
+      const request = (await supa('review_requests', { method: 'POST', body: JSON.stringify({ telegram_user_id: -Date.now(), telegram_chat_id: 0, label: `Web review: ${label}` }) }))[0];
+      return res.status(201).json({ ok: true, requestId: request.id, message: 'Fictional review request created. Open the Svetlana manager view and link this request to the Fictional Test Employee.' });
+    }
+    const actor = await resolveActor(input.as);
     if (action === 'linkReviewRequest') {
       if (actor.role !== 'manager') throw new Error('Only the fictional manager can link a review request.');
       const requestId = String(input.requestId || '');
@@ -35,7 +41,7 @@ module.exports = async (req, res) => {
       const testEmployee = await staffByName('Fictional Test Employee');
       await supa(`review_requests?id=eq.${request.id}`, { method: 'PATCH', body: JSON.stringify({ status: 'linked', linked_staff_id: testEmployee.id, linked_by: actor.id, linked_at: new Date().toISOString() }) });
       await audit(actor, 'staff', `review-${request.id}`, 'linked fictional test employee', { role: testEmployee.role, staff_name: testEmployee.name });
-      return res.status(200).json({ ok: true, message: 'The reviewer was linked to the fictional test salesperson. They can now submit only TEST-S and TEST-E records.' });
+      return res.status(200).json({ ok: true, message: 'The reviewer was linked to the fictional test salesperson. They can now submit only labelled TEST-S records.' });
     }
     if (action === 'sale') {
       if (actor.role !== 'sales') throw new Error('Only sales employees can submit test sales.');
