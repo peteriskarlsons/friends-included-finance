@@ -10,7 +10,7 @@ module.exports = async (_req, res) => {
       'Proposed allocation', 'Final allocation', 'Decision by', 'Decision at', 'Record type'
     ]];
     expenses.forEach(expense => rows.push([
-      expense.reference, String(expense.submitted_at || '').slice(0, 10), expense.submitted_by_name,
+      expense.reference, String(expense.submitted_at || '').slice(0, 10) ? `${String(expense.submitted_at || '').slice(0, 10)} (UTC)` : '', expense.submitted_by_name,
       expense.project === 'overhead' ? 'Overhead' : expense.project === 'unallocated' ? 'Unallocated' : expense.project,
       expense.category, expense.description, expense.amount,
       expense.allocation_status === 'awaiting_allocation' ? 'Awaiting allocation' : expense.allocation_status === 'allocated' ? 'Allocated' : 'Recorded',
