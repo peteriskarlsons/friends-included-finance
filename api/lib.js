@@ -80,7 +80,17 @@ async function loadLedger(actor) {
   const expenses = await supa(`expenses?select=${expenseFields}&submitted_by=eq.${actor.id}&order=reference.asc`);
   return { sales: [], expenses: expenses.map(expense => decorateExpense({ ...expense, submitted_by_name: actor.name })) };
 }
-async function loadReviewRequests() { return supa('review_requests?select=id,telegram_user_id,telegram_chat_id,status,requested_at,label&status=eq.requested&order=requested_at.asc'); }
+async function loadReviewRequests() {
+  const [requests, staff] = await Promise.all([
+    supa('review_requests?select=id,telegram_user_id,telegram_chat_id,status,linked_staff_id,requested_at,linked_at,label&status=in.(requested,linked)&order=requested_at.asc'),
+    supa('staff?select=id,name,role')
+  ]);
+  const staffById = Object.fromEntries(staff.map(person => [person.id, person]));
+  return requests.map(request => {
+    const linked = staffById[request.linked_staff_id];
+    return linked ? { ...request, linked_staff_name: linked.name, linked_staff_role: linked.role } : request;
+  });
+}
 async function requestReviewLink(userId, chatId) {
   const rows = await supa(`review_requests?select=id,status,linked_staff_id&telegram_user_id=eq.${encodeURIComponent(userId)}&limit=1`);
   const existing = rows[0];
