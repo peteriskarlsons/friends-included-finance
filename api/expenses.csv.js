@@ -15,7 +15,7 @@ module.exports = async (_req, res) => {
       expense.category, expense.description, expense.amount,
       expense.allocation_status === 'awaiting_allocation' ? 'Awaiting allocation' : expense.allocation_status === 'allocated' ? 'Allocated' : 'Recorded',
       expense.proposed_allocation || '', expense.project === 'unallocated' ? '' : expense.project, expense.allocated_by_name || '',
-      String(expense.allocated_at || '').slice(0, 19), expense.is_test_record ? 'Labelled test' : 'Original Test 2'
+      String(expense.allocated_at || '').slice(0, 19) ? `${String(expense.allocated_at || '').slice(0, 19)} (UTC)` : '', expense.is_test_record ? 'Labelled test' : 'Original Test 2'
     ]));
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Cache-Control', 'no-store');
