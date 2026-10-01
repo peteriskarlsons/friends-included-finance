@@ -18,7 +18,7 @@ module.exports = async (_req, res) => {
         sale.reference, String(sale.submitted_at || '').slice(0, 10) ? `${String(sale.submitted_at || '').slice(0, 10)} (UTC)` : '', sale.submitted_by_name, sale.customer, sale.project, sale.description,
         sale.amount, 0.1, sale.approved_commission || '', sale.status === 'approved' ? 'Approved' : 'Pending',
         proposal.richard, proposal.anastasia, proposal.jean, final.richard ?? '', final.anastasia ?? '', final.jean ?? '',
-        earned.richard ?? '', earned.anastasia ?? '', earned.jean ?? '', sale.approved_by_name || '', String(sale.approved_at || '').slice(0, 19),
+        earned.richard ?? '', earned.anastasia ?? '', earned.jean ?? '', sale.approved_by_name || '', String(sale.approved_at || '').slice(0, 19) ? `${String(sale.approved_at || '').slice(0, 19)} (UTC)` : '',
         sale.is_test_record ? 'Labelled test' : 'Original Test 2'
       ]);
     });
