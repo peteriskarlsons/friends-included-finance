@@ -91,7 +91,8 @@ module.exports = async (req, res) => {
       const existing = await supa(`expenses?select=id&reference=eq.${encodeURIComponent(reference)}&limit=1`);
       if (existing[0]) throw new Error('That test expense reference already exists.');
       const allocationStatus = proposedAllocation === 'overhead' ? 'recorded' : 'awaiting_allocation';
-      await supa('expenses', { method: 'POST', body: JSON.stringify({ reference, submitted_by: staff.id, category, description, amount: value, proposed_allocation: proposedAllocation, project: proposedAllocation, allocation_status: allocationStatus, is_test_record: true }) });
+      const finalProject = proposedAllocation === 'overhead' ? 'overhead' : 'unallocated';
+      await supa('expenses', { method: 'POST', body: JSON.stringify({ reference, submitted_by: staff.id, category, description, amount: value, proposed_allocation: proposedAllocation, project: finalProject, allocation_status: allocationStatus, is_test_record: true }) });
       await audit(staff, 'expense', reference, 'labelled Telegram test expense submitted', { proposed_allocation: proposedAllocation });
       await reply(chatId, `${reference} saved with proposed allocation ${proposedAllocation}.`);
     } else if (command === '/approve' && staff.role === 'manager') {
