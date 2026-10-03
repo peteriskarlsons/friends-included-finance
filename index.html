@@ -30,7 +30,7 @@
   const people={richard:'Richard',anastasia:'Anastasia',jean:'Jean-Claude'};
   function toast(text){const el=$('#toast');el.textContent=text;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),4200)}
   async function request(path,options){const response=await fetch(path,options);const payload=await response.json().catch(()=>({}));if(!response.ok)throw new Error(payload.error||'Shared ledger request failed');return payload}
-  async function load(){try{data=await request('/api/dashboard?as='+encodeURIComponent(role));render()}catch(error){$('#recordLine').textContent='The shared ledger is unavailable.';toast(error.message)}}
+  async function load(){try{data=await request('/api/dashboard?as='+encodeURIComponent(role)+'&refresh='+Date.now());render()}catch(error){$('#recordLine').textContent='The shared ledger is unavailable.';toast(error.message)}}
   const splitText=split=>split?['richard','anastasia','jean'].map(p=>people[p]+' '+split[p]+'%').join(' · '):'—';
   function finalText(sale){if(!sale.final_split)return 'Pending manager decision';return '<div>'+splitText(sale.final_split)+'</div><div class="earnings">'+['richard','anastasia','jean'].map(p=>'<span class="earn">'+people[p]+' '+money(sale.final_earnings[p])+'</span>').join('')+'</div>'}
   function allocationLabel(value){return value==='overhead'?'Company overhead':value==='unallocated'||!value?'—':'Project '+value}
