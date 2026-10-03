@@ -76,7 +76,8 @@ module.exports = async (req, res) => {
       const [saleMatch, expenseMatch] = await Promise.all([supa(`sales?select=id&reference=eq.${encodeURIComponent(reference)}&limit=1`), supa(`expenses?select=id&reference=eq.${encodeURIComponent(reference)}&limit=1`)]);
       if (saleMatch[0] || expenseMatch[0]) throw new Error('That test reference already exists.');
       const allocationStatus = proposedAllocation === 'overhead' ? 'recorded' : 'awaiting_allocation';
-      await supa('expenses', { method: 'POST', body: JSON.stringify({ reference, submitted_by: actor.id, category, description, amount, proposed_allocation: proposedAllocation, project: proposedAllocation, allocation_status: allocationStatus, is_test_record: true }) });
+      const finalProject = proposedAllocation === 'overhead' ? 'overhead' : 'unallocated';
+      await supa('expenses', { method: 'POST', body: JSON.stringify({ reference, submitted_by: actor.id, category, description, amount, proposed_allocation: proposedAllocation, project: finalProject, allocation_status: allocationStatus, is_test_record: true }) });
       await audit(actor, 'expense', reference, 'labelled test expense submitted', { proposed_allocation: proposedAllocation, allocation_status: allocationStatus });
       return res.status(201).json({ ok: true, message: proposedAllocation === 'overhead' ? `${reference} was recorded as labelled test overhead.` : `${reference} is a labelled test expense awaiting final allocation.` });
     }
