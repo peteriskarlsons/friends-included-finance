@@ -107,7 +107,10 @@ async function telegramActorFor(userId) {
   return linked ? { ...linked, source: 'review_link', review_request_id: request.id, telegram_chat_id: request.telegram_chat_id } : null;
 }
 async function reviewerChatForStaff(staffId) {
-  const rows = await supa(`review_requests?select=telegram_chat_id&linked_staff_id=eq.${staffId}&status=eq.linked&limit=1`);
+  // A manager can switch a reviewer between the fictional sales and Kevin
+  // expense-test roles. Prefer the most recently linked account so an old
+  // reviewer account can never receive the current reviewer's decision.
+  const rows = await supa(`review_requests?select=telegram_chat_id&linked_staff_id=eq.${staffId}&status=eq.linked&order=linked_at.desc&limit=1`);
   return rows[0]?.telegram_chat_id || null;
 }
 
