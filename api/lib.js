@@ -6,6 +6,8 @@ const actorNames = {
 };
 const splitPeople = ['richard', 'anastasia', 'jean'];
 const displayNames = { richard: 'Richard', anastasia: 'Anastasia', jean: 'Jean-Claude' };
+const googleSpreadsheetId = '1jJ1jH0tH7SW58GX9ThlU67rDJ3ghJEcRkDJN3MV0Hvg';
+const liveExpensesSheetId = '2022673188';
 
 const isReady = () => Boolean(api && key);
 const headers = () => ({
@@ -114,6 +116,60 @@ async function reviewerChatForStaff(staffId) {
   return rows[0]?.telegram_chat_id || null;
 }
 
+function parseCsv(text) {
+  const rows = []; let row = []; let field = ''; let quoted = false;
+  for (let index = 0; index < text.length; index += 1) {
+    const character = text[index];
+    if (quoted) {
+      if (character === '"' && text[index + 1] === '"') { field += '"'; index += 1; }
+      else if (character === '"') quoted = false;
+      else field += character;
+      continue;
+    }
+    if (character === '"') quoted = true;
+    else if (character === ',') { row.push(field); field = ''; }
+    else if (character === '\n') { row.push(field); rows.push(row); row = []; field = ''; }
+    else if (character !== '\r') field += character;
+  }
+  if (field || row.length) { row.push(field); rows.push(row); }
+  return rows.filter(values => values.some(value => value !== ''));
+}
+const allocationStatusLabel = status => status === 'awaiting_allocation' ? 'Awaiting allocation' : status === 'allocated' ? 'Allocated' : 'Recorded';
+const finalAllocation = expense => expense.project === 'unallocated' ? '' : String(expense.project || '');
+
+async function inspectExpenseSheetSync(expenses, reference = '') {
+  const wantedReference = String(reference || '').trim().toUpperCase();
+  const expected = expenses.filter(expense => expense.is_test_record && (!wantedReference || expense.reference === wantedReference));
+  const checkedAt = new Date().toISOString();
+  if (wantedReference && !expected.length) return { state: 'failed', checkedAt, reference: wantedReference, reason: 'The labelled expense does not exist in the shared ledger.' };
+  if (!expected.length) return { state: 'synced', checkedAt, matched: 0, message: 'No labelled expense records need Sheet confirmation.' };
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 4500);
+  try {
+    const url = `https://docs.google.com/spreadsheets/d/${googleSpreadsheetId}/export?format=csv&gid=${liveExpensesSheetId}&check=${Date.now()}`;
+    const response = await fetch(url, { signal: controller.signal });
+    if (!response.ok) throw new Error(`Google Sheets export returned ${response.status}`);
+    const rows = parseCsv(await response.text());
+    const headers = rows.shift() || [];
+    const column = Object.fromEntries(headers.map((header, index) => [header, index]));
+    for (const required of ['Reference', 'Allocation status', 'Proposed allocation', 'Final allocation']) {
+      if (column[required] === undefined) throw new Error(`Google Sheets export is missing ${required}.`);
+    }
+    const byReference = new Map(rows.map(row => [row[column.Reference], row]));
+    const pendingReferences = expected.filter(expense => {
+      const row = byReference.get(expense.reference);
+      return !row || row[column['Allocation status']] !== allocationStatusLabel(expense.allocation_status)
+        || row[column['Proposed allocation']] !== String(expense.proposed_allocation || '')
+        || row[column['Final allocation']] !== finalAllocation(expense);
+    }).map(expense => expense.reference);
+    return pendingReferences.length
+      ? { state: 'pending', checkedAt, matched: expected.length - pendingReferences.length, pendingReferences, reference: wantedReference || pendingReferences[0], message: `Google Sheets has not yet confirmed ${pendingReferences.join(', ')}.` }
+      : { state: 'synced', checkedAt, matched: expected.length, reference: wantedReference || expected[expected.length - 1].reference, message: `${expected.length} labelled expense record${expected.length === 1 ? '' : 's'} match the Live Expenses Sheet.` };
+  } catch (error) {
+    return { state: 'failed', checkedAt, reference: wantedReference || expected[expected.length - 1].reference, reason: error.name === 'AbortError' ? 'Google Sheets export timed out.' : error.message || 'Google Sheets export could not be read.' };
+  } finally { clearTimeout(timeout); }
+}
+
 function dashboardFor(actor, ledger) {
   const approved = ledger.sales.filter(sale => sale.status === 'approved');
   const pendingSales = ledger.sales.filter(sale => sale.status === 'pending');
@@ -161,5 +217,5 @@ function dashboardFor(actor, ledger) {
 function csvCell(value) { const text = value === null || value === undefined ? '' : String(value); return /[\",\n]/.test(text) ? `\"${text.replace(/\"/g, '\"\"')}\"` : text; }
 function csv(rows) { return rows.map(row => row.map(csvCell).join(',')).join('\n'); }
 
-module.exports = { actorNames, csv, dashboardFor, displayNames, earnings, isReady, loadLedger, loadReviewRequests, requestReviewLink, resolveActor, reviewerChatForStaff, round, split, splitPeople, staffByName, supa, telegramActorFor, validateSplit };
+module.exports = { actorNames, csv, dashboardFor, displayNames, earnings, inspectExpenseSheetSync, isReady, loadLedger, loadReviewRequests, requestReviewLink, resolveActor, reviewerChatForStaff, round, split, splitPeople, staffByName, supa, telegramActorFor, validateSplit };
 
