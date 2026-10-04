@@ -18,8 +18,7 @@ function installExpenseSync() {
   const triggers = ScriptApp.getProjectTriggers();
   triggers.filter(trigger => trigger.getHandlerFunction() === 'scheduledExpenseSync').forEach(trigger => ScriptApp.deleteTrigger(trigger));
   ScriptApp.newTrigger('scheduledExpenseSync').timeBased().everyMinutes(5).create();
-  const report = syncLiveExpenses_();
-  SpreadsheetApp.getUi().alert(`Live Expenses sync installed. ${report}`);
+  return syncLiveExpenses_();
 }
 
 function scheduledExpenseSync() {
@@ -27,8 +26,7 @@ function scheduledExpenseSync() {
 }
 
 function retryLiveExpenses() {
-  const report = syncLiveExpenses_();
-  SpreadsheetApp.getUi().alert(report);
+  return syncLiveExpenses_();
 }
 
 function retryExpenseReference() {
