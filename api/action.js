@@ -1,4 +1,4 @@
-const { earnings, isReady, resolveActor, reviewerChatForStaff, staffByName, supa, validateSplit } = require('./lib');
+const { earnings, inspectExpenseSheetSync, isReady, loadLedger, resolveActor, reviewerChatForStaff, staffByName, supa, validateSplit } = require('./lib');
 
 const bodyFor = req => typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {});
 const validTestReference = (reference, prefix) => new RegExp(`^TEST-${prefix}\\d+$`).test(reference || '');
@@ -109,6 +109,22 @@ module.exports = async (req, res) => {
       const sent = await notifyLinkedReviewer(expense.submitted_by, telegramMessage);
       await audit(actor, 'expense', reference, 'labelled test allocation decision recorded', { proposed_allocation: expense.proposed_allocation, final_allocation: project, telegram_message: telegramMessage, telegram_sent: sent });
       return res.status(200).json({ ok: true, message: `${reference} final allocation is ${project}.${sent ? ' A Telegram receipt was sent.' : ''}` });
+    }
+    if (action === 'retryExpenseSheetCheck') {
+      if (actor.role !== 'manager') throw new Error('Only the fictional manager can retry a shared Sheet check.');
+      const reference = String(input.reference || '').trim().toUpperCase();
+      if (!validTestReference(reference, 'E')) throw new Error('Choose an existing labelled TEST-E reference.');
+      const ledger = await loadLedger(actor);
+      const expense = ledger.expenses.find(item => item.reference === reference);
+      if (!expense || !expense.is_test_record) throw new Error('Only an existing labelled TEST-E record can be retried. No new record was created.');
+      const sync = await inspectExpenseSheetSync(ledger.expenses, reference);
+      await audit(actor, 'expense', reference, 'shared Sheet sync check retried', { state: sync.state, checked_at: sync.checkedAt, reason: sync.reason || sync.message || '' });
+      const message = sync.state === 'synced'
+        ? `${reference} is confirmed in Live Expenses with its current decision.`
+        : sync.state === 'pending'
+          ? `${reference} remains one shared record. Google Sheets has not confirmed its latest data yet; use Finance sync → Retry Live Expenses now in the Sheet, then retry this check.`
+          : `${reference} was not recreated. The Google Sheets export check failed: ${sync.reason}`;
+      return res.status(200).json({ ok: true, sync, message });
     }
     throw new Error('Unknown shared-ledger action.');
   } catch (error) { return res.status(400).json({ error: error.message || 'Unable to update shared ledger' }); }
